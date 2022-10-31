@@ -1,67 +1,74 @@
-import os
-import twitter
-from requests_oauthlib import OAuth1Session
 from flask import Flask, request
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
+from twitter_script import consumer_key, consumer_secret
+import tweepy
+import json
+import os
+
+CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
+CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
+
 
 app = Flask(__name__)
-CORS(app)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
 
-CONSUMER_KEY = os.environ.get("CONSUMER_KEY")
-CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET")
-TWITTER_REQUEST_TOKEN_URL = "https://api.twitter.com/oauth/request_token"
-TWITTER_ACCESS_TOKEN_URL = "https://api.twitter.com/oauth/access_token"
+@app.route('/auth_twitter', methods = ["POST"])
+@cross_origin()
+def authorize_twitter():
+
+    body = request.get_json()
+    print(request.json)
+    callback_url = body.get("callback_url")
+    print(callback_url)
+    
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET, callback_url)
+
+    try:
+        redirect_url = auth.get_authorization_url()
+        return json.dumps({"message":"success", "redirect_url": redirect_url })
+    except tweepy.TweepError as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to get request token", "redirect_url": None})
 
 
-@app.route("/request_token")
-def request_oauth_token():
-    request_token = OAuth1Session(
-        client_key=CONSUMER_KEY, client_secret=CONSUMER_SECRET, callback_uri="http://localhost:3000/following"
-    )
-    data = request_token.get(TWITTER_REQUEST_TOKEN_URL)
-    if data.status_code == 200:
-        request_token = str.split(data.text, '&')
-        oauth_token = str.split(request_token[0], '=')[1]
-        oauth_callback_confirmed = str.split(request_token[2], '=')[1]
-        return {
-            "oauth_token": oauth_token,
-            "oauth_callback_confirmed": oauth_callback_confirmed,
-        }
-    else:
-        return {
-            "oauth_token": None,
-            "oauth_callback_confirmed": "false",
-        }
+@app.route('/twitter_auth_callback', methods=["GET"])
+@cross_origin()
+def twitter_callback():
+    try:
+        oauth_token = request.args.get('oauth_token')
+        oauth_verifier = request.args.get('oauth_verifier')
 
-@app.route("/access_token")
-def request_access_token():
-    oauth_token = OAuth1Session(
-        client_key=CONSUMER_KEY,
-        client_secret=CONSUMER_SECRET,
-        resource_owner_key=request.args.get("oauth_token"),
-    )
-    data = {"oauth_verifier": request.args.get("oauth_verifier")}
-    response = oauth_token.post(TWITTER_ACCESS_TOKEN_URL, data=data)
-    access_token = str.split(response.text, '&')
-    access_token_key = str.split(access_token[0], '=')[1]
-    access_token_secret = str.split(access_token[1], '=')[1]
-    api = twitter.Api(
-        consumer_key=CONSUMER_KEY,
-        consumer_secret=CONSUMER_SECRET,
-        access_token_key=access_token_key,
-        access_token_secret=access_token_secret,
-    )
-    friends = api.GetFriends()
-    return {
-        "followings": [
-            {
-                "name": u.name,
-                "img": u.profile_image_url_https,
-                "description": u.description,
-            }
-            for u in friends
-        ]
-    }
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 
-if __name__ == "__main__":
+        auth_dict = { "oauth_token": oauth_token, "oauth_token_secret": oauth_verifier }
+        print(auth_dict)
+        auth.request_token = auth_dict
+        auth.get_access_token(oauth_verifier)
+        api = tweepy.API(auth)
+        print(api)
+        print("ACCESS TOKEN: ",auth.access_token)
+        print("ACCESS SECRET: ", auth.access_token_secret)
+
+        # You can save the access token and secret to a file or database and reuse them as seen below
+        
+        # user_auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        # user_auth.set_access_token(auth.access_token, auth.access_token_secret)
+        # user_api = tweepy.API(user_auth)
+
+        user = api.verify_credentials()
+        username = user.screen_name
+        user_id = user.id
+        return json.dumps({"message":"success", "user_id": user_id, "username": username, "access_token": auth.access_token, "access_token_secret": auth.access_token_secret})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to get tokens"}), 500
+
+@app.route('/')
+def home():
+    return "API is Alive and Well!"
+
+
+if __name__ == '__main__':
+    app.secret_key = "AUTH_KWESI_SECRET"
     app.run()
