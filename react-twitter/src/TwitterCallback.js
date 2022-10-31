@@ -3,7 +3,9 @@ import axios from 'axios';
 
 function Twittercallback() {
     const API_URL = "http://localhost:5000"
+
     const [data, setData] = useState({});
+    
     useEffect(() => {
         //pick params and send api request to get final user data
         const path = window.location.href;

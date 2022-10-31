@@ -1,6 +1,5 @@
 from flask import Flask, request
 from flask_cors import CORS, cross_origin
-from twitter_script import consumer_key, consumer_secret
 import tweepy
 import json
 import os
