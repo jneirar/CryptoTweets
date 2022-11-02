@@ -3,10 +3,18 @@ from flask_cors import CORS, cross_origin
 import tweepy
 import json
 import os
+import psycopg2
 
+# Twitter API credentials
 CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
 CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
 
+# PostgreSQL credentials
+POSTGRES_HOST = 'localhost'
+POSTGRES_PORT = '5433'
+POSTGRES_USER = 'postgres'
+POSTGRES_PASSWORD = 'postgres'
+POSTGRES_DB = 'cryptotweets'
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -49,12 +57,6 @@ def twitter_callback():
         print("ACCESS TOKEN: ",auth.access_token)
         print("ACCESS SECRET: ", auth.access_token_secret)
 
-        # You can save the access token and secret to a file or database and reuse them as seen below
-        
-        # user_auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        # user_auth.set_access_token(auth.access_token, auth.access_token_secret)
-        # user_api = tweepy.API(user_auth)
-
         user = api.verify_credentials()
         username = user.screen_name
         user_id = user.id
@@ -63,11 +65,112 @@ def twitter_callback():
         print(ex)
         return json.dumps({"message":"Failed to get tokens"}), 500
 
-@app.route('/')
-def home():
-    return "API is Alive and Well!"
+# Endpoint to post a tweet, get acces_token and access_token_secret from header
+@app.route('/post_tweet', methods=['POST'])
+@cross_origin()
+def post_tweet():
+    print("POST TWEET")
+    body = request.get_json()
+    
+    tweet = body.get("tweet")
+    access_token = request.headers.get("access_token")
+    access_token_secret = request.headers.get("access_token_secret")
+    print("Access Token: ", access_token)
+    print("Access Token Secret: ", access_token_secret)
+    print("Tweet: ", tweet)
 
+    try:
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        auth.set_access_token(access_token, access_token_secret)
+        api = tweepy.API(auth)
+        api.update_status(tweet)
+        return json.dumps({"message":"success"})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to post tweet"}), 500
+
+# Endpoint to check if the user_id is in the postgresql database
+@app.route('/check_user', methods=['POST'])
+@cross_origin()
+def check_user():
+    body = request.get_json()
+    user_id = body.get("user_id")
+    print("User ID: ", user_id)
+    try:
+        # Check if user_id is in the database
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+        user = cur.fetchone()
+        print(user)
+        cur.close()
+        if user is None:
+            return json.dumps({"message":"success", "user_exists": False})
+        else:
+            return json.dumps({"message":"success", "user_exists": True})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to check user"}), 500
+
+
+# Endpoint to get the id user from the username
+@app.route('/get_user_id', methods=['GET'])
+@cross_origin()
+def get_user_id():
+    print("GET USER ID")
+    body = request.get_json()
+    username = body.get("username")
+    access_token = request.headers.get("access_token")
+    access_token_secret = request.headers.get("access_token_secret")
+    print("Access Token: ", access_token)
+    print("Access Token Secret: ", access_token_secret)
+    print("Username: ", username)
+
+    try:
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        auth.set_access_token(access_token, access_token_secret)
+        api = tweepy.API(auth)
+        user = api.get_user(screen_name=username)
+        return json.dumps({"message":"success", "user_id": user.id})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to get user id"}), 500
+
+# Endpoint to get tweets that include a text
+@app.route('/get_tweets', methods=['GET'])
+@cross_origin()
+def get_tweets():
+    print("GET TWEETS")
+    body = request.get_json()
+    text = body.get("text")
+    access_token = request.headers.get("access_token")
+    access_token_secret = request.headers.get("access_token_secret")
+    print("Access Token: ", access_token)
+    print("Access Token Secret: ", access_token_secret)
+    print("Text: ", text)
+
+    try:
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        auth.set_access_token(access_token, access_token_secret)
+        api = tweepy.API(auth)
+        tweets = api.search_tweets(q=text, count=100)
+        tweets_list = []
+        for tweet in tweets:
+            tweets_list.append(tweet.text)
+        return json.dumps({"message":"success", "tweets": tweets_list})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to get tweets"}), 500
 
 if __name__ == '__main__':
     app.secret_key = "AUTH_KWESI_SECRET"
+    
+    conn = psycopg2.connect(
+        host=POSTGRES_HOST,
+        database=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+        port=POSTGRES_PORT
+    )
     app.run()
+    print("Server closed")
+    conn.close()
