@@ -1,54 +1,34 @@
-from tinyec import registry
-from Crypto.Cipher import AES
-import hashlib, secrets, binascii
-
-def compress_point(point):
-    return hex(point.x) + hex(point.y % 2)[2:]
-
-def encrypt_AES_GCM(msg, secretKey):
-    aesCipher = AES.new(secretKey, AES.MODE_GCM)
-    ciphertext, authTag = aesCipher.encrypt_and_digest(msg)
-    return (ciphertext, aesCipher.nonce, authTag)
-
-def decrypt_AES_GCM(ciphertext, nonce, authTag, secretKey):
-    aesCipher = AES.new(secretKey, AES.MODE_GCM, nonce)
-    plaintext = aesCipher.decrypt_and_verify(ciphertext, authTag)
-    return plaintext
-
-def ecc_point_to_256_bit_key(point):
-    sha = hashlib.sha256(int.to_bytes(point.x, 32, 'big'))
-    sha.update(int.to_bytes(point.y, 32, 'big'))
-    return sha.digest()
-
-curve = registry.get_curve('brainpoolP256r1')
-
-def encrypt_ECC(msg, pubKeyReceiver, privKeySender):
-    sharedECCKey = privKeySender * pubKeyReceiver
-    secretKey = ecc_point_to_256_bit_key(sharedECCKey)
-    ciphertext, nonce, authTag = encrypt_AES_GCM(msg, secretKey)
-    return (ciphertext, nonce, authTag)
-
-def decrypt_ECC(encryptedMsg, privKeyReceiver, pubKeySender):
-    (ciphertext, nonce, authTag) = encryptedMsg
-    sharedECCKey = privKeyReceiver * pubKeySender
-    secretKey = ecc_point_to_256_bit_key(sharedECCKey)
-    plaintext = decrypt_AES_GCM(ciphertext, nonce, authTag, secretKey)
-    return plaintext
-
-def decrypt_ECC_sender(encryptedMsg, privKeySender, pubKeyReceiver):
-    (ciphertext, nonce, authTag) = encryptedMsg
-    sharedECCKey = privKeySender * pubKeyReceiver
-    secretKey = ecc_point_to_256_bit_key(sharedECCKey)
-    plaintext = decrypt_AES_GCM(ciphertext, nonce, authTag, secretKey)
-    return plaintext
-    
+from encrypt_functions import *
 
 msg = b'Hola Bob, como estas?'
 print("original msg:", msg)
-privKeyAlice = secrets.randbelow(curve.field.n)
-pubKeyAlice = privKeyAlice * curve.g
-privKeyBob = secrets.randbelow(curve.field.n)
-pubKeyBob = privKeyBob * curve.g
+privKeyAlice, pubKeyAlice = generate_keys()
+privKeyBob, pubKeyBob = generate_keys()
+first = pubKeyAlice.x
+second = pubKeyAlice.y
+limit = 64
+# first to hex string with limit characters, fill with spaces
+first = str(hex(first))[2:].zfill(limit)
+second = str(hex(second))[2:].zfill(limit)
+print(len(first))
+print(len(second))
+print(type(pubKeyAlice))
+# Generate tinyec point with first and second
+pub = ec.Point(curve, int(first,16), int(second,16))
+#remove 0 leading and convert to int
+print(pubKeyAlice == pub)
+'''
+print(pubKeyAlice)
+print(len(hex(pubKeyAlice.x)))
+print(len(hex(pubKeyAlice.y)))
+print(len(hex(pubKeyAlice.x) + hex(pubKeyAlice.y)))
+print(first, len(first))
+print(second, len(second))
+print(hex(pubKeyAlice.x) + hex(pubKeyAlice.y))
+print(first + second)
+print(len(first + second))
+'''
+
 
 encryptedMsg = encrypt_ECC(msg, pubKeyBob, privKeyAlice)
 encryptedMsgObj = {

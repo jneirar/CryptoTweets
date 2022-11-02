@@ -1,0 +1,3 @@
+[submodule "flask-twitter/CryptoTweets_public"]
+	path = flask-twitter/CryptoTweets_public
+	url = https://github.com/jneirar/CryptoTweets_public.git
