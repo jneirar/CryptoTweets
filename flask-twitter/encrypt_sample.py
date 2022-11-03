@@ -10,25 +10,9 @@ limit = 64
 # first to hex string with limit characters, fill with spaces
 first = str(hex(first))[2:].zfill(limit)
 second = str(hex(second))[2:].zfill(limit)
-print(len(first))
-print(len(second))
-print(type(pubKeyAlice))
 # Generate tinyec point with first and second
 pub = ec.Point(curve, int(first,16), int(second,16))
 #remove 0 leading and convert to int
-print(pubKeyAlice == pub)
-'''
-print(pubKeyAlice)
-print(len(hex(pubKeyAlice.x)))
-print(len(hex(pubKeyAlice.y)))
-print(len(hex(pubKeyAlice.x) + hex(pubKeyAlice.y)))
-print(first, len(first))
-print(second, len(second))
-print(hex(pubKeyAlice.x) + hex(pubKeyAlice.y))
-print(first + second)
-print(len(first + second))
-'''
-
 
 encryptedMsg = encrypt_ECC(msg, pubKeyBob, privKeyAlice)
 encryptedMsgObj = {

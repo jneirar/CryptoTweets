@@ -72,7 +72,7 @@ def check_user():
         if user is None:
             return json.dumps({"message":"success", "user_exists": False})
         else:
-            return json.dumps({"message":"success", "user_exists": True})
+            return json.dumps({"message":"success", "user_exists": True, "user_id": user[0], "user_id_twitter": user[1], "user_public_key": user[2]})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to check user"}), 500
@@ -94,7 +94,7 @@ def get_users():
         for user in users:
             twitter_user = twitter_get_user_by_id(user[1], access_token, access_token_secret)
             if(twitter_user is not None):
-                twitter_users.append({"user_id": user[1], "username": twitter_user.screen_name, "public_key": user[2]})
+                twitter_users.append({"user_id": user[0], "user_id_twitter": user[1], "username": twitter_user.screen_name, "public_key": user[2]})
         return json.dumps({"message":"success", "users_number": len(twitter_users), "users": twitter_users})
     except Exception as ex:
         print(ex)
@@ -149,7 +149,8 @@ def post_tweet():
 @cross_origin()
 def create_keys():
     body = request.get_json()
-    user_id = body.get("user_id")
+    user_id_twitter = body.get("user_id")
+    user_username = body.get("user_username")
     try:
         # Generate keys
         private_key, public_key = generate_keys()
@@ -159,12 +160,12 @@ def create_keys():
 
         # Save keys in the database
         cur = conn.cursor()
-        cur.execute("INSERT INTO users (user_id_twitter, user_public_key) VALUES (%s, %s)", (user_id, public_key_string))
+        cur.execute("INSERT INTO users (user_id_twitter, user_public_key) VALUES (%s, %s)", (user_id_twitter, public_key_string))
         conn.commit()
         cur.close()
 
         # save public key in the repository
-        add_public_key(user_id, public_key_string)
+        add_public_key(user_id_twitter, user_username, public_key_string)
         return json.dumps({"message":"success", "private_key": private_key_string, "public_key": public_key_string})
     except Exception as ex:
         print(ex)
@@ -175,18 +176,22 @@ def create_keys():
 @cross_origin()
 def post_tweet_with_keys():
     body = request.get_json()
-    tweet = body.get("tweet")
-    public_key_sender = body.get("public_key_sender")
-    public_key_receiver = body.get("public_key_receiver")
+    tweet_to_post = {}
+    tweet_to_post["tweet"] = body.get("tweet")
+    tweet_to_post["public_key_sender"] = body.get("public_key_sender")
+    tweet_to_post["public_key_receiver"] = body.get("public_key_receiver")
+    tweet_to_post["user_id_sender"] = body.get("user_id_sender")
+    tweet_to_post["user_id_receiver"] = body.get("user_id_receiver")
+
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
     try:
         # Post tweet with public keys
-        confirmed, id = twitter_post_tweet_with_public_keys(tweet, public_key_sender, public_key_receiver, access_token, access_token_secret)
+        confirmed, id = twitter_post_tweet_with_public_keys(tweet_to_post, access_token, access_token_secret)
         if confirmed:
             # Save tweet in the database
             cur = conn.cursor()
-            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_public_key_sender, tweet_public_key_receiver, tweet_readed, tweet_timestamp) VALUES (%s, %s, %s, %s, %s)", (id, public_key_sender, public_key_receiver, False, datetime.now()))
+            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_timestamp) VALUES (%s, %s, %s, %s, %s, %s, %s)", (id, tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], "nounce", "MAC", False, datetime.now()))
             conn.commit()
             cur.close()
             return json.dumps({"message":"success"})
@@ -220,17 +225,17 @@ def get_tweet_by_id():
 @cross_origin()
 def get_not_readed_tweets():
     body = request.get_json()
-    public_key_string = body.get("public_key")
+    user_id = body.get("user_id")
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
     try:
         # Get all not readed tweets from database
         cur = conn.cursor()
-        cur.execute("SELECT * FROM tweets WHERE tweet_readed = FALSE AND tweet_public_key_receiver = %s", (public_key_string,))
+        cur.execute("SELECT * FROM tweets WHERE tweet_readed = FALSE AND tweet_user_id_receiver = %s", (user_id,))
         rows = cur.fetchall()
         cur.close()
         tweets = []
-        # For each tweet, get tweet from twitter and update database
+        # For each row obtained, get tweet from twitter and update database
         for row in rows:
             tweet_id_twitter = row[1]
             
