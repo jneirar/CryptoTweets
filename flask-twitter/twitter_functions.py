@@ -68,5 +68,22 @@ def twitter_post_tweet(text, access_token, access_token_secret):
         print(ex)
         return False
 
+# Post tweet with public keys
+def twitter_post_tweet_with_public_keys(text, public_key_sender, public_key_receiver, access_token, access_token_secret):
+    api = twitter_set_access_token(access_token, access_token_secret)
+    try:
+        tweet_posted = api.update_status(public_key_sender + "," + public_key_receiver + "," + text)
+        return True, tweet_posted.id
+    except Exception as ex:
+        print(ex)
+        return False, 0
 
-    
+# Get tweet by id
+def twitter_get_tweet_by_id(id_tweet, access_token, access_token_secret):
+    api = twitter_set_access_token(access_token, access_token_secret)
+    try:
+        tweet = api.get_status(id=id_tweet, tweet_mode="extended")
+        return tweet
+    except Exception as ex:
+        print(ex)
+        return None

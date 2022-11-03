@@ -4,6 +4,7 @@ import tweepy
 import json
 import os
 import psycopg2
+from datetime import datetime
 
 from twitter_functions import *
 from encrypt_functions import *
@@ -11,7 +12,7 @@ from public_keys_github import *
 
 # PostgreSQL credentials
 POSTGRES_HOST = 'localhost'
-POSTGRES_HOST = '172.23.208.1'
+POSTGRES_HOST = '172.25.64.1' #76.42
 POSTGRES_PORT = '5432'
 POSTGRES_USER = 'postgres'
 POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD')
@@ -80,7 +81,6 @@ def check_user():
 @app.route('/get_users', methods=['GET'])
 @cross_origin()
 def get_users():
-    print("GET USERS")
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
     try:
@@ -95,7 +95,7 @@ def get_users():
             twitter_user = twitter_get_user_by_id(user[1], access_token, access_token_secret)
             if(twitter_user is not None):
                 twitter_users.append({"user_id": user[1], "username": twitter_user.screen_name, "public_key": user[2]})
-        return json.dumps({"message":"success", "users": twitter_users})
+        return json.dumps({"message":"success", "users_number": len(twitter_users), "users": twitter_users})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to get users"}), 500
@@ -153,23 +153,114 @@ def create_keys():
     try:
         # Generate keys
         private_key, public_key = generate_keys()
+        # private key is a number, public key is a point
         private_key_string = private_key_to_string(private_key)
         public_key_string = public_key_to_string(public_key)
-        # private key is a number, public key is a point
 
         # Save keys in the database
         cur = conn.cursor()
         cur.execute("INSERT INTO users (user_id_twitter, user_public_key) VALUES (%s, %s)", (user_id, public_key_string))
         conn.commit()
         cur.close()
+
+        # save public key in the repository
+        add_public_key(user_id, public_key_string)
         return json.dumps({"message":"success", "private_key": private_key_string, "public_key": public_key_string})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to create keys"}), 500
 
+# Endpoint to post a tweet with public keys
+@app.route('/post_tweet_with_keys', methods=['POST'])
+@cross_origin()
+def post_tweet_with_keys():
+    body = request.get_json()
+    tweet = body.get("tweet")
+    public_key_sender = body.get("public_key_sender")
+    public_key_receiver = body.get("public_key_receiver")
+    access_token = request.headers.get("access_token")
+    access_token_secret = request.headers.get("access_token_secret")
+    try:
+        # Post tweet with public keys
+        confirmed, id = twitter_post_tweet_with_public_keys(tweet, public_key_sender, public_key_receiver, access_token, access_token_secret)
+        if confirmed:
+            # Save tweet in the database
+            cur = conn.cursor()
+            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_public_key_sender, tweet_public_key_receiver, tweet_readed, tweet_timestamp) VALUES (%s, %s, %s, %s, %s)", (id, public_key_sender, public_key_receiver, False, datetime.now()))
+            conn.commit()
+            cur.close()
+            return json.dumps({"message":"success"})
+        else:
+            return json.dumps({"message":"Twitter post not confirmed"}), 500
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to post tweet with keys"}), 500
+
+# Endpoint to search tweet by tweet_id
+@app.route('/get_tweet_by_id', methods=['GET'])
+@cross_origin()
+def get_tweet_by_id():
+    body = request.get_json()
+    tweet_id = body.get("tweet_id")
+    access_token = request.headers.get("access_token")
+    access_token_secret = request.headers.get("access_token_secret")
+    try:
+        tweet = twitter_get_tweet_by_id(tweet_id, access_token, access_token_secret)
+        if tweet is not None:
+            print(tweet.full_text)
+            return json.dumps({"message":"success", "tweet": tweet._json})
+        else:
+            return json.dumps({"message":"Failed to get tweet by id"}), 500
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to get tweet by id"}), 500
+
+# Endpoint to get not readed tweets from database
+@app.route('/get_not_readed_tweets', methods=['GET'])
+@cross_origin()
+def get_not_readed_tweets():
+    body = request.get_json()
+    public_key_string = body.get("public_key")
+    access_token = request.headers.get("access_token")
+    access_token_secret = request.headers.get("access_token_secret")
+    try:
+        # Get all not readed tweets from database
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM tweets WHERE tweet_readed = FALSE AND tweet_public_key_receiver = %s", (public_key_string,))
+        rows = cur.fetchall()
+        cur.close()
+        tweets = []
+        # For each tweet, get tweet from twitter and update database
+        for row in rows:
+            tweet_id_twitter = row[1]
+            
+            # Get tweet from twitter
+            tweet = twitter_get_tweet_by_id(tweet_id_twitter, access_token, access_token_secret)
+            tweets.append(tweet._json)
+        return json.dumps({"message":"success", "tweets_number": len(tweets), "tweets": tweets})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to update not readed tweets"}), 500
+
+# Endpoint to update not readed tweet from database
+@app.route('/update_not_readed_tweets', methods=['POST'])
+@cross_origin()
+def update_not_readed_tweets():
+    body = request.get_json()
+    tweet_id = body.get("tweet_id")
+    try:
+        # Update not readed tweet from database
+        cur = conn.cursor()
+        cur.execute("UPDATE tweets SET tweet_readed = TRUE WHERE tweet_id_twitter = %s", (tweet_id,))
+        conn.commit()
+        cur.close()
+        return json.dumps({"message":"success"})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to update not readed tweets"}), 500
+
 if __name__ == '__main__':
     app.secret_key = "AUTH_KWESI_SECRET"
-    
     conn = psycopg2.connect(
         host=POSTGRES_HOST,
         database=POSTGRES_DB,
