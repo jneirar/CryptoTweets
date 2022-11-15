@@ -5,6 +5,7 @@ import './index.css';
 import App from './App';
 import Twittercallback from './TwitterCallback'; //new
 import reportWebVitals from './reportWebVitals';
+import FunctionTest from './functionstest'; //new
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -13,6 +14,7 @@ root.render(
       <Routes>
         <Route path="/" element={<App/>} />
         <Route path="/twitter_auth_callback" element={<Twittercallback/>} />{/*new*/}
+        <Route path="/test" element={<FunctionTest/>} />{/*new*/}
       </Routes>
     </BrowserRouter>
   </>
