@@ -7,12 +7,20 @@ privKeyBob, pubKeyBob = generate_keys()
 first = pubKeyAlice.x
 second = pubKeyAlice.y
 limit = 64
-# first to hex string with limit characters, fill with spaces
-first = str(hex(first))[2:].zfill(limit)
-second = str(hex(second))[2:].zfill(limit)
-# Generate tinyec point with first and second
-pub = ec.Point(curve, int(first,16), int(second,16))
-#remove 0 leading and convert to int
+
+print("Alice's private key:", private_key_to_string(privKeyAlice))
+print("Length of Alice's private key:", len(private_key_to_string(privKeyAlice)))
+print("Alice's public key:", public_key_to_string(pubKeyAlice))
+print("Length of Alice's public key:", len(public_key_to_string(pubKeyAlice)))
+print()
+print("Bob's private key:", private_key_to_string(privKeyBob))
+print("Length of Bob's private key:", len(private_key_to_string(privKeyBob)))
+print("Bob's public key:", public_key_to_string(pubKeyBob))
+print("Length of Bob's public key:", len(public_key_to_string(pubKeyBob)))
+print()
+
+
+
 
 encryptedMsg = encrypt_ECC(msg, pubKeyBob, privKeyAlice)
 encryptedMsgObj = {

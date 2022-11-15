@@ -69,10 +69,10 @@ def twitter_post_tweet(text, access_token, access_token_secret):
         return False
 
 # Post tweet with public keys
-def twitter_post_tweet_with_public_keys(tweet_to_post, access_token, access_token_secret):
+def twitter_post_crypted_tweet(tweet_to_post, access_token, access_token_secret):
     api = twitter_set_access_token(access_token, access_token_secret)
     try:
-        tweet_posted = api.update_status(tweet_to_post["text"])
+        tweet_posted = api.update_status(tweet_to_post["tweet_crypted"])
         return True, tweet_posted.id
     except Exception as ex:
         print(ex)
