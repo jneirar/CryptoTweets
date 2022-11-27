@@ -171,7 +171,7 @@ def create_keys():
 
 
 # Post a crypted tweet
-# Input: header (tokens), tweet_crypted, user_id_sender, user_id_receiver, tweet_nounce_ tweet_mac
+# Input: header (tokens), tweet_crypted, user_id_sender, user_id_receiver, tweet_nounce_ tweet_mac, private_key_hashed
 # Output:
 @app.route('/post_crypted_tweet', methods=['POST'])
 @cross_origin()
@@ -183,6 +183,18 @@ def post_tweet_with_keys():
     tweet_to_post["user_id_receiver"] = body.get("user_id_receiver")
     tweet_to_post["tweet_nounce"] = body.get("tweet_nounce")
     tweet_to_post["tweet_mac"] = body.get("tweet_mac")
+    
+    private_key_hashed = body.get("private_key_hashed")
+
+    # Verify private key hashed with the one in the database
+    cur = conn.cursor()
+    cur.execute("SELECT user_private_key_crypted FROM users WHERE user_id_twitter = %s", (tweet_to_post["user_id_sender"],))
+    private_key_hashed_db = cur.fetchone()
+    cur.close()
+    if private_key_hashed_db is None:
+        return json.dumps({"message":"Private key not founded for user id twitter"}), 500
+    if private_key_hashed_db[0] != private_key_hashed:
+        return json.dumps({"message":"Private key not valid for this user"}), 500
 
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
