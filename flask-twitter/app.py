@@ -22,21 +22,21 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 
 
 # Auth twitter
-@app.route('/auth_twitter', methods = ["POST"])
+@app.route('/auth_twitter', methods=["POST"])
 @cross_origin()
 def authorize_twitter():
     print("AUTH TWITTER")
     body = request.get_json()
     callback_url = body.get("callback_url")
-    
+
     auth = twitter_auth(callback_url)
-    
+
     try:
         redirect_url = auth.get_authorization_url()
-        return json.dumps({"message":"success", "redirect_url": redirect_url })
+        return json.dumps({"message": "success", "redirect_url": redirect_url})
     except tweepy.TweepError as ex:
         print(ex)
-        return json.dumps({"message":"Failed to get request token", "redirect_url": None})
+        return json.dumps({"message": "Failed to get request token", "redirect_url": None})
 
 
 # Auth twitter callback
@@ -48,23 +48,21 @@ def twitter_callback():
         oauth_verifier = request.args.get('oauth_verifier')
 
         user, access_token, access_token_secret = twitter_auth_user(oauth_token, oauth_verifier)
-        
+
         username = user.screen_name
-        user_id = user.id
-        return json.dumps({"message":"success", "user_id": user_id, "username": username, "access_token": access_token, "access_token_secret": access_token_secret})
+        user_id = user.id_str
+        return json.dumps({"message": "success", "user_id": user_id, "username": username, "access_token": access_token, "access_token_secret": access_token_secret})
     except Exception as ex:
         print(ex)
-        return json.dumps({"message":"Failed to get tokens"}), 500
+        return json.dumps({"message": "Failed to get tokens"}), 500
 
 
 # Check if the user_id_twitter is already in the database
 # Input: user_id_twitter
 # Output: user_exists, user_id, user_id_twitter
-@app.route('/check_user', methods=['GET'])
-@cross_origin()
 def check_user():
-    body = request.get_json()
-    user_id_twitter = body.get("user_id_twitter")
+    print(request)
+    user_id_twitter = str(request.args.get("user_id_twitter"))
     try:
         # Check if user_id is in the database
         cur = conn.cursor()
@@ -90,22 +88,23 @@ def check_user():
 def get_users():
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
+    this_user_id = tweet_id = request.args.get("user_id")
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM users")
         users = cur.fetchall()
         cur.close()
         # Get twitter users from users
-        
         twitter_users = []
         for user in users:
             twitter_user = twitter_get_user_by_id(user[1], access_token, access_token_secret)
-            if(twitter_user is not None):
-                twitter_users.append({"user_id": user[0], "user_id_twitter": user[1], "username": twitter_user.screen_name, "public_key": user[2]})
-        return json.dumps({"message":"success", "users_number": len(twitter_users), "users": twitter_users})
+            if (twitter_user is not None and user[1] != this_user_id):  #change from is not None
+                twitter_users.append({"user_id": user[0], "user_id_twitter": user[1], "username": twitter_user.screen_name, #changed from "username": twitter_user.screen_name
+                     "public_key": user[2]})
+        return json.dumps({"message": "success", "users_number": len(twitter_users), "users": twitter_users})
     except Exception as ex:
         print(ex)
-        return json.dumps({"message":"Failed to get users"}), 500
+        return json.dumps({"message": "Failed to get users"}), 500
 
 
 # Get the id user from the username in twitter
@@ -118,12 +117,12 @@ def get_user_id():
     username = body.get("username")
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
-    
-    user = twitter_get_user_id_from_username(username, access_token, access_token_secret)    
+
+    user = twitter_get_user_id_from_username(username, access_token, access_token_secret)
     if user is not None:
-        return json.dumps({"message":"success", "user_id": user.id})
+        return json.dumps({"message": "success", "user_id": user.id})
     else:
-        return json.dumps({"message":"Failed to get user id from username"}), 500
+        return json.dumps({"message": "Failed to get user id from username"}), 500
 
 
 # Get tweets that include a text
@@ -133,6 +132,7 @@ def get_user_id():
 @app.route('/get_tweets_from_text', methods=['GET'])
 @cross_origin()
 def get_tweets_from_text():
+
     body = request.get_json()
     text = body.get("text")
     access_token = request.headers.get("access_token")
@@ -151,10 +151,12 @@ def get_tweets_from_text():
 @cross_origin()
 def create_keys():
     body = request.get_json()
-    user_id_twitter = body.get("user_id_twitter")
-    user_username = body.get("user_username")
+    print(body)
+    user_id_twitter = body.get('user_id_twitter')
+    user_username = body.get('user_username')
     user_public_key = body.get("user_public_key")
     user_private_key_hashed = body.get("user_private_key_hashed")
+    print("IDTWITTER:  ",user_id_twitter)
     try:
         # Save keys in the database
         cur = conn.cursor()
@@ -163,7 +165,7 @@ def create_keys():
         cur.close()
 
         # save public key in the repository
-        add_public_key(user_id_twitter, user_username, user_public_key)
+        #add_public_key(user_id_twitter, user_username, user_public_key)
         return json.dumps({"message":"success"})
     except Exception as ex:
         print(ex)
@@ -177,35 +179,28 @@ def create_keys():
 @cross_origin()
 def post_tweet_with_keys():
     body = request.get_json()
+    print(body)
     tweet_to_post = {}
     tweet_to_post["tweet_crypted"] = body.get("tweet_crypted")
-    tweet_to_post["user_id_sender"] = body.get("user_id_sender")
-    tweet_to_post["user_id_receiver"] = body.get("user_id_receiver")
+    tweet_to_post["user_id_sender"] = int(body.get("user_id_sender"))
+    tweet_to_post["user_id_receiver"] =     int(body.get("user_id_receiver"))
     tweet_to_post["tweet_nounce"] = body.get("tweet_nounce")
     tweet_to_post["tweet_mac"] = body.get("tweet_mac")
-    
-    private_key_hashed = body.get("private_key_hashed")
+    tweet_to_post["cypherdata"] = body.get("cipherdata")
 
-    # Verify private key hashed with the one in the database
-    cur = conn.cursor()
-    cur.execute("SELECT user_private_key_crypted FROM users WHERE user_id_twitter = %s", (tweet_to_post["user_id_sender"],))
-    private_key_hashed_db = cur.fetchone()
-    cur.close()
-    if private_key_hashed_db is None:
-        return json.dumps({"message":"Private key not founded for user id twitter"}), 500
-    if private_key_hashed_db[0] != private_key_hashed:
-        return json.dumps({"message":"Private key not valid for this user"}), 500
+    print(tweet_to_post)
 
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
     try:
         # Post tweet with public keys
         confirmed, id = twitter_post_crypted_tweet(tweet_to_post, access_token, access_token_secret)
+        print(confirmed)
+        print(id)
         if confirmed:
             # Save tweet in the database
             cur = conn.cursor()
-            cur.execute("\
-                INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_timestamp) VALUES (%s, %s, %s, %s, %s, %s, %s)", (id, tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], tweet_to_post["tweet_nounce"], tweet_to_post["tweet_mac"], False, datetime.now()))
+            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_timestamp, cypherdata) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (str(id), tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], tweet_to_post["tweet_nounce"], tweet_to_post["tweet_mac"], False, datetime.now(), tweet_to_post["cypherdata"]))
             conn.commit()
             cur.close()
             return json.dumps({"message":"success"})
@@ -222,20 +217,22 @@ def post_tweet_with_keys():
 @app.route('/get_tweet_by_id', methods=['GET'])
 @cross_origin()
 def get_tweet_by_id():
-    body = request.get_json()
-    tweet_id = body.get("tweet_id")
+    tweet_id = request.args.get("tweet_id")
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
+    print("TWEET ID")
+    print(tweet_id)
+
     try:
         tweet = twitter_get_tweet_by_id(tweet_id, access_token, access_token_secret)
         if tweet is not None:
             print(tweet.full_text)
-            return json.dumps({"message":"success", "tweet": tweet._json})
+            return json.dumps({"message": "success", "tweet": tweet._json})
         else:
-            return json.dumps({"message":"Tweet not founded"}), 500
+            return json.dumps({"message": "Tweet not founded"}), 500
     except Exception as ex:
         print(ex)
-        return json.dumps({"message":"Failed to get tweet by id"}), 500
+        return json.dumps({"message": "Failed to get tweet by id"}), 500
 
 
 # Get not readed tweets from database
@@ -296,23 +293,44 @@ def update_not_readed_tweets():
         return json.dumps({"message":"Failed to update not readed tweets"}), 500
 
 
+@app.route('/get_tweet_db_by_id', methods=['GET'])
+@cross_origin()
+def get_tweet_db_by_id():
+    twitterID = request.args.get("tweet_id")
+    print(twitterID)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM tweets WHERE tweet_id_twitter = %s", (twitterID,))
+        rows = cur.fetchall()
+        tweet = rows[0]
+        conn.commit()
+        cur.close()
+        return json.dumps({"message": "success", "tweet": tweet[:7]})
+    except Exception as ex:
+        print(ex)
+        return json.dumps({"message":"Failed to load tweet"}), 500
+
+
 # Get public key from a user_id
 # Input: user_id
 # Output: public_key
 @app.route('/get_public_key', methods=['GET'])
 @cross_origin()
 def get_public_key():
-    body = request.get_json()
-    user_id = body.get("user_id")
+    print(request)
+    user_id = str(request.args.get("user_id"))
+    print("User id: ", user_id)
     try:
         # Get public key from database
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+        command = "SELECT * FROM users WHERE user_id_twitter = '" + user_id + "'"
+        cur.execute(command)
         rows = cur.fetchall()
         cur.close()
         if len(rows) == 0:
             return json.dumps({"message":"User not found"}), 500
         public_key = rows[0][2]
+        print("PUBLIC KEY: ", public_key)
         return json.dumps({"message":"success", "public_key": public_key})
     except Exception as ex:
         print(ex)
@@ -370,7 +388,6 @@ def get_tweets_from_user_id():
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to get tweets from user id"}), 500
-
 
 
 if __name__ == '__main__':
