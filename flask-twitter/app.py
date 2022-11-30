@@ -173,7 +173,7 @@ def create_keys():
 
 
 # Post a crypted tweet
-# Input: header (tokens), tweet_crypted, user_id_sender, user_id_receiver, tweet_nounce_ tweet_mac, private_key_hashed
+# Input: header (tokens), tweet_crypted, user_id_sender, user_id_receiver, tweet_nounce_ tweet_mac, private_key_hashed, tweet_ciphertext
 # Output:
 @app.route('/post_crypted_tweet', methods=['POST'])
 @cross_origin()
@@ -186,9 +186,7 @@ def post_tweet_with_keys():
     tweet_to_post["user_id_receiver"] =     int(body.get("user_id_receiver"))
     tweet_to_post["tweet_nounce"] = body.get("tweet_nounce")
     tweet_to_post["tweet_mac"] = body.get("tweet_mac")
-    tweet_to_post["cypherdata"] = body.get("cipherdata")
-
-    print(tweet_to_post)
+    tweet_to_post["private_key_hashed"] = body.get("private_key_hashed")
 
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
@@ -200,7 +198,7 @@ def post_tweet_with_keys():
         if confirmed:
             # Save tweet in the database
             cur = conn.cursor()
-            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_timestamp, cypherdata) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (str(id), tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], tweet_to_post["tweet_nounce"], tweet_to_post["tweet_mac"], False, datetime.now(), tweet_to_post["cypherdata"]))
+            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_timestamp, tweet_cyphertext) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (str(id), tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], tweet_to_post["tweet_nounce"], tweet_to_post["tweet_mac"], False, datetime.now(), tweet_to_post["tweet_cyphertext"]))
             conn.commit()
             cur.close()
             return json.dumps({"message":"success"})
@@ -252,6 +250,7 @@ def get_not_readed_tweets():
         rows = cur.fetchall()
         cur.close()
         tweets = []
+        cyphertweets = []
         # For each row obtained, get tweet from twitter and update database
         for row in rows:
             tweet_id_twitter = row[1]
@@ -260,7 +259,8 @@ def get_not_readed_tweets():
             if tweet is None:
                 continue
             tweets.append(tweet._json)
-        return json.dumps({"message":"success", "tweets_number": len(tweets), "tweets": tweets})
+            cyphertweets.append(row[8])
+        return json.dumps({"message":"success", "tweets_number": len(tweets), "tweets": tweets, "cyphertweets": cyphertweets})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to get not readed tweets"}), 500
