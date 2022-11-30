@@ -13,7 +13,7 @@ def add_public_key(id_twitter, username_twitter, public_key):
         os.system("git commit -m \"Added public key for " + username_twitter + "\"")
         os.system("git push")
         os.chdir("..")
-        return True 
+        return True
     except Exception as ex:
         print(ex)
         os.chdir("..")
@@ -38,7 +38,7 @@ def modify_public_key(id_twitter, public_key):
         os.system("git commit -m \"Modified public key for " + id_twitter + "\"")
         os.system("git push")
         os.chdir("..")
-        return True 
+        return True
     except Exception as ex:
         print(ex)
         os.chdir("..")
