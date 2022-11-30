@@ -259,8 +259,8 @@ def get_not_readed_tweets():
             if tweet is None:
                 continue
             tweets.append(tweet._json)
-            cyphertweets.append(row[8])
-        return json.dumps({"message":"success", "tweets_number": len(tweets), "tweets": tweets, "cyphertweets": cyphertweets})
+            cyphertweets.append({"tweet_id_twitter": tweet_id_twitter, "tweet_cyphertext": row[8]})
+        return json.dumps({"message":"success", "tweets_number": len(tweets), "cyphertweets": cyphertweets, "tweets": tweets})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to get not readed tweets"}), 500
