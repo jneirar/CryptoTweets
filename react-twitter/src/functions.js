@@ -24,7 +24,7 @@ export const generateKeyPair = async () => {
 export const savePrivateKeyToFile = async (key) => {
     const exportedKey = await window.crypto.subtle.exportKey(
         "jwk", //can be "jwk" or "raw"
-        key
+        key.privateKey
     )
         .then(function (keydata) {
             //returns the exported key data
@@ -51,7 +51,7 @@ export const saveKeyToFile = async (key) => {
         .catch(function (err) {
             console.error(err);
         });
-    
+
     const exportedPublicKey = await window.crypto.subtle.exportKey(
         "jwk", //can be "jwk" or "raw"
         key.publicKey
@@ -63,7 +63,7 @@ export const saveKeyToFile = async (key) => {
         .catch(function (err) {
             console.error(err);
         });
-        
+
     // make a json object with both keys
     const keyPair = {
         privateKey: exportedPrivateKey,
@@ -77,6 +77,7 @@ export const saveKeyToFile = async (key) => {
 
 
 export const importPrivateKeyFromFile = async (jsonData) => {
+    console.log("LLAVE: ", jsonData);
     const importedKey = await window.crypto.subtle.importKey(
         "jwk", //can be "jwk" or "raw"
         jsonData, //this is an example j
@@ -97,8 +98,30 @@ export const importPrivateKeyFromFile = async (jsonData) => {
     return importedKey;
 }
 
+export const importPublicKeyFromFile = async (jsonData) => {
+    console.log("LLAVE PUBLICA: ", jsonData);
+    const importedKey = await window.crypto.subtle.importKey(
+        "jwk", //can be "jwk" or "raw"
+        jsonData, //this is an example j
+        {   //these are the algorithm options
+            name: "ECDH",
+            namedCurve: "P-256", //can be "P-256", "P-384", or "P-521"
+        },
+        true, //whether the key is extractable (i.e. can be used in exportKey)
+        [] //can be any combination of "deriveKey" and "deriveBits"
+    )
+        .then(function (key) {
+            //returns the symmetric key
+            return key;
+        })
+        .catch(function (err) {
+            console.error(err);
+        });
+    return importedKey;
+}
+
 export const importKeyPairFromFile = async (jsonData) => {
-    
+
     const importedPrivateKey = await window.crypto.subtle.importKey(
         "jwk", //can be "jwk" or "raw"
         jsonData['privateKey'], //this is an example j
@@ -194,15 +217,15 @@ export const encryptData = async (key, data) => {
         key,
         dataBuffer
     )
-    .then(function (encrypted) {
-            //returns an ArrayBuffer containing the encrypted data
-            return encrypted;
-        }
+        .then(function (encrypted) {
+                //returns an ArrayBuffer containing the encrypted data
+                return encrypted;
+            }
         )
-    .catch(function (err) {
-            console.log("Encryption error");
-            console.error(err);
-        }
+        .catch(function (err) {
+                console.log("Encryption error");
+                console.error(err);
+            }
         );
     return {
         cipherdata: encryptedData,
@@ -235,4 +258,8 @@ export const decryptData = async (key, cipherdata, iv, tag) => {
 
 export const tagToString = (tag) => {
     return String.fromCharCode.apply(null, tag);
+}
+
+export const StringToTag = (chr) => {
+    return chr.charCodeAt.apply(null, chr);
 }

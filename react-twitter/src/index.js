@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import Twittercallback from './TwitterCallback'; //new
 import reportWebVitals from './reportWebVitals';
-import FunctionTest from './functionstest'; //new
+import TwitterCallback from "./TwitterCallback";
+import HomePage from "./PAGES/Home";
+import FunctionTest from './functiontest'; //new
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -13,8 +14,10 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App/>} />
-        <Route path="/twitter_auth_callback" element={<Twittercallback/>} />{/*new*/}
-        <Route path="/test" element={<FunctionTest/>} />{/*new*/}
+        <Route path="/twitter_auth_callback" element={<TwitterCallback/>} />{/*new*/}
+          <Route path="/twitter_auth_callback" element={<TwitterCallback/>} />{/*new*/}
+          <Route path="/home" element={<HomePage/>}/>{}
+          <Route path="/test" element={<FunctionTest/>} />{/*new*/}
       </Routes>
     </BrowserRouter>
   </>
