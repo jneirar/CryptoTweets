@@ -1,6 +1,3 @@
-'''
-# NOT USED
-
 from tinyec import registry, ec
 from Crypto.Cipher import AES
 import hashlib, secrets, binascii
@@ -62,8 +59,3 @@ def decrypt_ECC_sender(encryptedMsg, privKeySender, pubKeyReceiver):
     secretKey = ecc_point_to_256_bit_key(sharedECCKey)
     plaintext = decrypt_AES_GCM(ciphertext, nonce, authTag, secretKey)
     return plaintext
-    
-def hash_private_key(private_key):
-    return hashlib.sha256(private_key_to_string(private_key).encode()).hexdigest()
-
-'''
