@@ -57,9 +57,12 @@ def twitter_callback():
         return json.dumps({"message": "Failed to get tokens"}), 500
 
 
+
 # Check if the user_id_twitter is already in the database
 # Input: user_id_twitter
 # Output: user_exists, user_id, user_id_twitter
+@app.route('/check_user', methods=['GET'])
+@cross_origin()
 def check_user():
     print(request)
     user_id_twitter = str(request.args.get("user_id_twitter"))
@@ -125,6 +128,9 @@ def get_user_id():
         return json.dumps({"message": "Failed to get user id from username"}), 500
 
 
+
+
+
 # Get tweets that include a text
 # Input: header (tokens), text
 # Output: tweets_number, tweets: list of tweets
@@ -146,7 +152,7 @@ def get_tweets_from_text():
 
 # Create new user
 # Input: user_id_twitter, user_username, user_public_key, user_private_key_hashed
-# Output: 
+# Output:
 @app.route('/create_user', methods=['POST'])
 @cross_origin()
 def create_keys():
@@ -165,15 +171,16 @@ def create_keys():
         cur.close()
 
         # save public key in the repository
-        #add_public_key(user_id_twitter, user_username, user_public_key)
+        add_public_key(user_id_twitter, user_username, user_public_key)
         return json.dumps({"message":"success"})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to create keys"}), 500
 
 
+
 # Post a crypted tweet
-# Input: header (tokens), tweet_crypted, user_id_sender, user_id_receiver, tweet_nounce_ tweet_mac, private_key_hashed, tweet_ciphertext
+# Input: header (tokens), tweet_crypted, user_id_sender, user_id_receiver, tweet_nounce_ tweet_mac
 # Output:
 @app.route('/post_crypted_tweet', methods=['POST'])
 @cross_origin()
@@ -186,7 +193,8 @@ def post_tweet_with_keys():
     tweet_to_post["user_id_receiver"] =     int(body.get("user_id_receiver"))
     tweet_to_post["tweet_nounce"] = body.get("tweet_nounce")
     tweet_to_post["tweet_mac"] = body.get("tweet_mac")
-    tweet_to_post["private_key_hashed"] = body.get("private_key_hashed")
+
+    print(tweet_to_post)
 
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
@@ -198,7 +206,7 @@ def post_tweet_with_keys():
         if confirmed:
             # Save tweet in the database
             cur = conn.cursor()
-            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_timestamp, tweet_cyphertext) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (str(id), tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], tweet_to_post["tweet_nounce"], tweet_to_post["tweet_mac"], False, datetime.now(), tweet_to_post["tweet_cyphertext"]))
+            cur.execute("INSERT INTO tweets (tweet_id_twitter, tweet_user_id_sender, tweet_user_id_receiver, tweet_nounce, tweet_mac, tweet_readed, tweet_cyphertext, tweet_timestamp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (str(id), tweet_to_post["user_id_sender"], tweet_to_post["user_id_receiver"], tweet_to_post["tweet_nounce"], tweet_to_post["tweet_mac"], False, tweet_to_post["tweet_crypted"], datetime.now()))
             conn.commit()
             cur.close()
             return json.dumps({"message":"success"})
@@ -208,10 +216,11 @@ def post_tweet_with_keys():
         print(ex)
         return json.dumps({"message":"Failed to post crypted tweet"}), 500
 
+    # Search tweet by tweet_id
+    # Input: header (tokens), tweet_id
+    # Output: tweet
 
-# Search tweet by tweet_id
-# Input: header (tokens), tweet_id
-# Output: tweet
+
 @app.route('/get_tweet_by_id', methods=['GET'])
 @cross_origin()
 def get_tweet_by_id():
@@ -233,24 +242,24 @@ def get_tweet_by_id():
         return json.dumps({"message": "Failed to get tweet by id"}), 500
 
 
+
 # Get not readed tweets from database
 # Input: header (tokens), user_id
 # Output: tweets_number, tweets: list of tweets
 @app.route('/get_not_readed_tweets', methods=['GET'])
 @cross_origin()
 def get_not_readed_tweets():
-    body = request.get_json()
-    user_id = body.get("user_id")
+    user_id =request.args.get("user_id")
+    print(user_id)
     access_token = request.headers.get("access_token")
     access_token_secret = request.headers.get("access_token_secret")
     try:
         # Get all not readed tweets from database
         cur = conn.cursor()
-        cur.execute("SELECT * FROM tweets WHERE tweet_readed = FALSE AND tweet_user_id_receiver = %s", (user_id,))
+        cur.execute("SELECT * FROM tweets WHERE tweet_readed = FALSE AND tweet_user_id_receiver = %s", (int(user_id),))
         rows = cur.fetchall()
         cur.close()
         tweets = []
-        cyphertweets = []
         # For each row obtained, get tweet from twitter and update database
         for row in rows:
             tweet_id_twitter = row[1]
@@ -259,8 +268,7 @@ def get_not_readed_tweets():
             if tweet is None:
                 continue
             tweets.append(tweet._json)
-            cyphertweets.append({"tweet_id_twitter": tweet_id_twitter, "tweet_cyphertext": row[8]})
-        return json.dumps({"message":"success", "tweets_number": len(tweets), "cyphertweets": cyphertweets, "tweets": tweets})
+        return json.dumps({"message":"success", "tweets_number": len(tweets), "tweets": tweets})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to get not readed tweets"}), 500
@@ -305,7 +313,7 @@ def get_tweet_db_by_id():
         tweet = rows[0]
         conn.commit()
         cur.close()
-        return json.dumps({"message": "success", "tweet": tweet[:7]})
+        return json.dumps({"message": "success", "tweet": tweet[:8]})
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to load tweet"}), 500
@@ -337,6 +345,7 @@ def get_public_key():
         return json.dumps({"message":"Failed to get public key"}), 500
 
 
+
 # Get private key hashed from a user_id
 # Input: user_id
 # Output: private_key_hashed
@@ -358,6 +367,7 @@ def get_private_key_hashed():
     except Exception as ex:
         print(ex)
         return json.dumps({"message":"Failed to get private key hashed"}), 500
+
 
 # Get tweets with id sender or id receiver from a user_id
 # Input: header (tokens), user_id
