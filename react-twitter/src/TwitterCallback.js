@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import myData from './privateKey.json';
-import myDataRec from './privateKeySUEL.json';
 import axios from 'axios';
 import './App.css';
 import * as functions from "./functions";
@@ -81,27 +79,7 @@ function Twittercallback() {
     }
 
     const test = async() =>{
-        const private1 = await functions.importPrivateKeyFromFile(myData);
-        const private2 = await functions.importPrivateKeyFromFile(myDataRec);
-        const public2request =  axios.get(`${API_URL}/get_public_key`, {params: {user_id : "1596050405640867841"}}).then(
-            async function llaves(outputKey) {
-                setRecibirPublicKey(outputKey.data["public_key"]);
-                let aux = JSON.parse(recibirPublicKey);
-                const public2 = await functions.importPublicKeyFromFile(aux);
-                const public1request = axios.get(`${API_URL}/get_public_key`, {params: {user_id : "1169792879813779456"}}).then(
-                    async function llavemia(outputkey2){
-                        let public1temp = outputkey2.data["public_key"];
-                        let public1 = await functions.importPublicKeyFromFile(JSON.parse(public1temp));
-                        const keyShared = await functions.deriveSecretKey(private1, public2);
-                        const keyShared2 = await functions.deriveSecretKey(private2, public1);
-                        const derived11data = await functions.extractData(keyShared);
-                        const derived22data = await functions.extractData(keyShared2);
-                        console.log("derived11data.k: ", derived11data.k);
-                        console.log("derived22data.k: ", derived22data.k);
-                    }
-                )
-            }
-        )
+        console.log("test");
     }
 
     const decrypt = async(e) =>{
@@ -170,31 +148,6 @@ function Twittercallback() {
 
     }
 
-    const encrypt = async () =>{
-        //const keyShared = await functions.deriveSecretKey(privateKeyVar, keyPublicFriend);
-        //read private key from file
-        const keyImported = await functions.importPrivateKeyFromFile(myData);
-        const keyImportedFriend = await functions.importPublicKeyFromFile(receiverKey);
-        const keyShared = await functions.deriveSecretKey(keyImported,keyImportedFriend);
-        const derived11data = await functions.extractData(keyShared);
-        console.log("KEY SHARED", derived11data.k);
-        const encryptResult = await functions.encryptData(keyShared, tweetText);
-
-        let textiton = ab2str(encryptResult.iv);
-        let texts = str2ab(textiton);
-
-        let textiton2 = ab2str(encryptResult.tag);
-        let texts2 = str2ab(textiton2);
-
-        const response6 = axios.post(`${API_URL}/post_crypted_tweet`, {tweet_crypted : ab2str(encryptResult.cipherdata), user_id_sender : data.id.toString(), user_id_receiver : friendKey.toString(), tweet_nounce : ab2str(encryptResult.iv), tweet_mac : ab2str(encryptResult.tag)}, {headers: {access_token: data.access_token.toString(), access_token_secret : data.access_token_secret.toString()}})
-            .then(r6 =>{
-                console.log(r6);
-                console.log("keyShared ", keyShared);
-                console.log("text: ", encryptResult.cipherdata);
-                console.log("nounce: ", encryptResult.iv);
-                console.log("mac; ", encryptResult.tag );
-            });
-    }
 
     const managePublicKey = async(key) => {
         const exportedKey = await window.crypto.subtle.exportKey(
